@@ -590,7 +590,7 @@ function parse (str, options) {
  * @return {!function(Object=, Object=)}
  */
 function compile (str, options) {
-  return tokensToFunction(parse(str, options))
+  return tokensToFunction(parse(str, options), options)
 }
 
 /**
@@ -620,14 +620,14 @@ function encodeAsterisk (str) {
 /**
  * Expose a method for transforming tokens into the path function.
  */
-function tokensToFunction (tokens) {
+function tokensToFunction (tokens, options) {
   // Compile all the tokens into regexps.
   var matches = new Array(tokens.length);
 
   // Compile all the patterns before compilation.
   for (var i = 0; i < tokens.length; i++) {
     if (typeof tokens[i] === 'object') {
-      matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$');
+      matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$', flags(options));
     }
   }
 
@@ -740,7 +740,7 @@ function attachKeys (re, keys) {
  * @return {string}
  */
 function flags (options) {
-  return options.sensitive ? '' : 'i'
+  return options && options.sensitive ? '' : 'i'
 }
 
 /**
@@ -1031,6 +1031,10 @@ var Link = {
     replace: Boolean,
     activeClass: String,
     exactActiveClass: String,
+    ariaCurrentValue: {
+      type: String,
+      default: 'page'
+    },
     event: {
       type: eventTypes,
       default: 'click'
@@ -1070,6 +1074,8 @@ var Link = {
     classes[activeClass] = this.exact
       ? classes[exactActiveClass]
       : isIncludedRoute(current, compareTarget);
+
+    const ariaCurrentValue = classes[exactActiveClass] ? this.ariaCurrentValue : null;
 
     const handler = e => {
       if (guardEvent(e)) {
@@ -1121,7 +1127,7 @@ var Link = {
 
     if (this.tag === 'a') {
       data.on = on;
-      data.attrs = { href };
+      data.attrs = { href, 'aria-current': ariaCurrentValue };
     } else {
       // find the first <a> child and apply listener and href
       const a = findAnchor(this.$slots.default);
@@ -1149,6 +1155,7 @@ var Link = {
 
         const aAttrs = (a.data.attrs = extend({}, a.data.attrs));
         aAttrs.href = href;
+        aAttrs['aria-current'] = ariaCurrentValue;
       } else {
         // doesn't have <a> child, apply listener to self
         data.on = on;
@@ -1825,7 +1832,7 @@ const supportsPushState =
       return false
     }
 
-    return window.history && 'pushState' in window.history
+    return window.history && typeof window.history.pushState === 'function'
   })();
 
 function pushState (url, replace) {
@@ -2539,8 +2546,15 @@ function getHash () {
 function getUrl (path) {
   const href = window.location.href;
   const i = href.indexOf('#');
-  const base = i >= 0 ? href.slice(0, i) : href;
-  return `${base}#${path}`
+  let base = i >= 0 ? href.slice(0, i) : href;
+  let query = '';
+  // If query string is present in URL, place it after the hash path
+  if (href.indexOf('?') >= 0) {
+    const j = href.indexOf('?');
+    base = base.slice(0, j);
+    query = href.slice(j);
+  }
+  return `${base}#${path}${query}`
 }
 
 function pushHash (path) {

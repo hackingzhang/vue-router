@@ -7,7 +7,7 @@
   typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
   typeof define === 'function' && define.amd ? define(factory) :
   (global = global || self, global.VueRouter = factory());
-}(this, function () { 'use strict';
+}(this, (function () { 'use strict';
 
   /*  */
 
@@ -610,7 +610,7 @@
    * @return {!function(Object=, Object=)}
    */
   function compile (str, options) {
-    return tokensToFunction(parse(str, options))
+    return tokensToFunction(parse(str, options), options)
   }
 
   /**
@@ -640,14 +640,14 @@
   /**
    * Expose a method for transforming tokens into the path function.
    */
-  function tokensToFunction (tokens) {
+  function tokensToFunction (tokens, options) {
     // Compile all the tokens into regexps.
     var matches = new Array(tokens.length);
 
     // Compile all the patterns before compilation.
     for (var i = 0; i < tokens.length; i++) {
       if (typeof tokens[i] === 'object') {
-        matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$');
+        matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$', flags(options));
       }
     }
 
@@ -760,7 +760,7 @@
    * @return {string}
    */
   function flags (options) {
-    return options.sensitive ? '' : 'i'
+    return options && options.sensitive ? '' : 'i'
   }
 
   /**
@@ -1051,6 +1051,10 @@
       replace: Boolean,
       activeClass: String,
       exactActiveClass: String,
+      ariaCurrentValue: {
+        type: String,
+        default: 'page'
+      },
       event: {
         type: eventTypes,
         default: 'click'
@@ -1095,6 +1099,8 @@
       classes[activeClass] = this.exact
         ? classes[exactActiveClass]
         : isIncludedRoute(current, compareTarget);
+
+      var ariaCurrentValue = classes[exactActiveClass] ? this.ariaCurrentValue : null;
 
       var handler = function (e) {
         if (guardEvent(e)) {
@@ -1144,7 +1150,7 @@
 
       if (this.tag === 'a') {
         data.on = on;
-        data.attrs = { href: href };
+        data.attrs = { href: href, 'aria-current': ariaCurrentValue };
       } else {
         // find the first <a> child and apply listener and href
         var a = findAnchor(this.$slots.default);
@@ -1172,6 +1178,7 @@
 
           var aAttrs = (a.data.attrs = extend({}, a.data.attrs));
           aAttrs.href = href;
+          aAttrs['aria-current'] = ariaCurrentValue;
         } else {
           // doesn't have <a> child, apply listener to self
           data.on = on;
@@ -1853,7 +1860,7 @@
         return false
       }
 
-      return window.history && 'pushState' in window.history
+      return window.history && typeof window.history.pushState === 'function'
     })();
 
   function pushState (url, replace) {
@@ -2591,7 +2598,14 @@
     var href = window.location.href;
     var i = href.indexOf('#');
     var base = i >= 0 ? href.slice(0, i) : href;
-    return (base + "#" + path)
+    var query = '';
+    // If query string is present in URL, place it after the hash path
+    if (href.indexOf('?') >= 0) {
+      var j = href.indexOf('?');
+      base = base.slice(0, j);
+      query = href.slice(j);
+    }
+    return (base + "#" + path + query)
   }
 
   function pushHash (path) {
@@ -2923,4 +2937,4 @@
 
   return VueRouter;
 
-}));
+})));
